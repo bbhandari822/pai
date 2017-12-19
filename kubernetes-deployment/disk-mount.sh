@@ -45,7 +45,7 @@ cp -r /var/lib/docker/* /mnt
 rm -rf /var/lib/docker/*
 mount $storagePathMountPoint /var/lib/docker
 
-umount $storagePath
+#umount $storagePath
 echo  "$storagePathMountPoint  /var/lib/docker   ext4    defaults    0 0" >> /etc/fstab
 
 touch $storagePath/mountdone
