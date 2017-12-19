@@ -36,6 +36,7 @@ sed -i "/127.0.1.1/s/^/# /" /etc/hosts
 #     sed -i "/$hostip/c\\$hostip $(hostname)" /etc/hosts || \
 #     sed -i "\$a$hostip $(hostname)" /etc/hosts
 
+./src/disk-mount.sh
 
 # Prepare docker for remote host
 if command -v docker >/dev/null 2>&1; then
