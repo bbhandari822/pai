@@ -33,7 +33,6 @@ restartDocker="restart"
 
 }
 
-
 if command -v docker >/dev/null 2>&1; then
     echo docker has been installed. And docker daemon will be stopped first.
     systemctl stop docker
