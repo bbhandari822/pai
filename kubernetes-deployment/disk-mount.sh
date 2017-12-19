@@ -20,8 +20,6 @@
 # This script will mount /var/lib/docker to the storagePath
 # In our VM: storagePath's mount point is /dev/sdb1
 
-sudo su
-
 storagePath="/mnt"
 storagePathMountPoint="/dev/sdb1"
 restartDocker="restart"
