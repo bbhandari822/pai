@@ -132,7 +132,7 @@ Add a NOT Requested Framework or Update a Requested Framework.
         1. Framework will be NonRolling Upgraded to new FrameworkVersion. (i.e. Not Work Preserving).
         2. NonRolling Upgrade can be used to change parameters in FrameworkDescription which is not supported by PartialUpdate (such as Framework Queue).
         3. NonRolling Upgrade should be triggered by change FrameworkVersion, instead of DELETE then PUT with the same FrameworkVersion.
-3. User is responsible to specify FrameworkName explicitly.
+3. User is responsible and free to specify the FrameworkName of the Framework, however, the FrameworkName should respect the [Framework ACL](#Framework_ACL).
 4. After Accepted Response, its corresponding Status (such as FrameworkStatus and AggregatedFrameworkStatus) exists immediately, too. However, the Status may not be updated according to the Request (FrameworkDescriptor) immediately. So, to check whether it has been updated, Client still needs to poll the GET Status APIs.
 
 **Response**
@@ -457,6 +457,18 @@ Get the ClusterConfiguration
 | ServiceUnavailable(503) | ExceptionMessage | Same as [PUT Framework](#PUT_Framework) |
 
 
+#### <a name="PUT_AclConfiguration">PUT AclConfiguration</a>
+**Request**
+
+    PUT /v1/LauncherRequest/AclConfiguration
+
+
+#### <a name="GET_AclConfiguration">GET AclConfiguration</a>
+**Request**
+
+    GET /v1/LauncherRequest/AclConfiguration
+
+
 ## <a name="DataModel">DataModel</a>
 You can check the DataStructure, Specification and FeatureUsage inside Launcher Data Model:
 
@@ -501,10 +513,91 @@ You can check the all the defined ExitStatus by: [ExitType](../src/main/java/com
 
 Recipes:
 1. Your LauncherClient can depend on the ExitStatus Convention
-2. If your Service failed, the Service can optionally return the ExitCode of USER_APP_TRANSIENT_ERROR and USER_APP_NON_TRANSIENT_ERROR to help FancyRetryPolicy to identify your Service’s TRANSIENT_NORMAL and NON_TRANSIENT ExitType. If neither ExitCode is returned, the Service is considered to exit due to UNKNOWN ExitType.
+2. If your Service failed, the Service can optionally return the ExitCode of USER_APP_TRANSIENT_ERROR and USER_APP_NON_TRANSIENT_ERROR to help FancyRetryPolicy to identify your Service's TRANSIENT_NORMAL and NON_TRANSIENT ExitType. If neither ExitCode is returned, the Service is considered to exit due to UNKNOWN ExitType.
 
 
-## <a name="Notes">Notes</a>
+## <a name="Framework_ACL">Framework ACL</a>
+### <a name="Framework_ACL_Overview">Overview</a>
+Framework ACL specifies which Users/Groups are able to access a specific FrameworkName, no matter the FrameworkName exists or not. So, essentially, it is the ACL for Users/Groups against FrameworkName's Namespace.
+
+Framework ACL helps to:
+1. Avoid one User/Group to occupy the FrameworkName (by Add Framework) reserved for other User/Group.
+2. Avoid one User/Group to modify the Framework (by Update Framework) launched by other User/Group.
+
+### <a name="Framework_ACL_Assumption">Assumption</a>
+1. Each User has a unique UserName.
+2. Each Group has a unique GroupName.
+3. No naming conflict among UserNames and GroupNames.
+
+### <a name="Framework_ACL_Usage">Usage</a>
+Framework ACL is enabled if and only if the webServerAclEnable is true, check it by [GET LauncherStatus](#GET_LauncherStatus).
+
+1. If it is disabled, any User/Group can Read and Write the whole namespace. We assume it is enabled for simplicity below.
+2. Administrator can always Read and Write the whole namespace, the fact will be omitted for simplicity below.
+
+**Namespace Privilege**:
+
+Namespace Write Privilege: Add or Update Framework in the Namespace
+
+Namespace Read Privilege: Get Framework in the Namespace
+
+**Namespace Mechanism**:
+
+    {Namespace}~(AnyName)
+
+1. It is pre-created, so no need to create the namespace in advance.
+2. All Users/Groups can Read the namespace.
+3. Initially, only the User named {Namespace} can Write the namespace. To give the Write Privilege to more Users, see [PUT AclConfiguration](#PUT_AclConfiguration).
+4. Based on the Assumption and Namespace Mechanism, the Usage Pattern for Users/Groups can be derived below.
+
+### <a name="Framework_ACL_Usage_Pattern">Usage Pattern</a>
+**User Usage Pattern**:
+
+The private namespace for the User named {UserName} is:
+
+    {UserName}~(AnyName)
+
+1. It is pre-created, so no need to create the namespace in advance.
+2. Only this User can Write the namespace. However, all other Users/Groups can Read the namespace.
+
+For example, User UA can fully control the namespace:
+
+    UA~(AnyName)
+
+**Group Usage Pattern**:
+
+The private namespace for the Group named {GroupName} is:
+
+The shared namespace for the Users belongs to {GroupName} is:
+
+    {GroupName}~(AnyName)
+
+1. It is pre-created, so no need to create the namespace in advance.
+2. Initially, no User can Write the namespace. Administrator needs to add the UserNames belongs to the {GroupName} to the namespace {GroupName}, see [PUT AclConfiguration](#PUT_AclConfiguration). Only then, these Users can Write the namespace. However, all other Users/Groups can Read the namespace.
+
+For example, Administrator adds User UA and UB belongs to Group GA to the namespace GA, and then UA and UB can work together to fully control the namespace:
+
+    GA~(AnyName)
+
+### <a name="Framework_ACL_Naming_Best_Practices">Naming Best Practices within Namespace</a>
+Launcher does not enforce Users/Groups how to further partition his private namespace or how to avoid naming conflict within his private namespace. Different Users/Groups might choose to use his private namespace differently, depending on their exact requirement, scenario and assumption.
+
+So, here, we just provide two best practices (common usage patterns) for two scenarios:
+
+**Batch Framework**:
+
+Batch Framework User tends to Add a new Framework each time instead of Update the existing one.
+
+So, he should ensure the name is not reused within his private namespace each time to call [PUT Framework](#PUT_Framework).
+
+**Service Framework**:
+
+Service Framework User tends to frequently Update the existing Framework instead of Add a new one. And he tends to specify a well-known name which he might want to expose to the Users of the Service itself.
+
+So, he should ensure the name is reused within his small set well-known Services each time to call [PUT Framework](#PUT_Framework). Anyway, If he really want to ensure to Add a new one, he needs to check his small set well-known Services, and then pick a new one.
+
+
+## <a name="Best_Practices">Best Practices</a>
 1. The **Initial Working Directory** of your EntryPoint is the root directory of the EntryPoint.
 Your Service can read data anywhere, however it can ONLY write data under the Initial Working Directory with the Service Directory excluded. And if the Source is a **ZIP file**, it will be uncompressed before starting your Service.
 For example:
